@@ -1,9 +1,7 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
-
 :root{--bg:#0d0f17;--panel:#171a27;--panel2:#1d2131;--border:#30364b;--text:#f6f6ff;--muted:#aeb8d2;--purple:#b8a1ff;--purple2:#8b72f4;--mint:#8de5cc;--danger:#ff797f}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth;scroll-padding-top:28px}
-body{margin:0;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;line-height:1.55}
+body{margin:0;background:var(--bg);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;line-height:1.55}
 button,input,select{font:inherit}
 button{cursor:pointer;transition:transform .16s ease,background .16s ease,border-color .16s ease}
 button:hover:not(:disabled){transform:translateY(-1px)}
@@ -12,7 +10,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 a{color:inherit}
 .hero-section{min-height:650px;padding:0 max(5.8vw,24px) 64px;background:radial-gradient(ellipse at 83% 42%,rgba(98,75,185,.13),transparent 40%),var(--bg)}
 .site-header,.chat-header{height:102px;max-width:1220px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:24px}
-.brand{display:inline-flex;align-items:center;gap:12px;text-decoration:none;font-family:Manrope,sans-serif;font-size:21px;font-weight:800;letter-spacing:-.7px}
+.brand{display:inline-flex;align-items:center;gap:12px;text-decoration:none;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;font-size:21px;font-weight:800;letter-spacing:-.7px}
 .brand-icon{width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#8873ff,#5946df);border-radius:10px;color:white;font-size:13px;letter-spacing:1px;box-shadow:0 7px 24px #7058f52b}
 .site-header nav{display:flex;gap:36px;align-items:center}
 .site-header nav a{font-size:13px;color:var(--muted);text-decoration:none}
