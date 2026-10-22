@@ -1,37 +1,37 @@
 # OmeChat
 
-A Next.js recreation of the supplied OmeChat interface. The responsive landing page and chat UI are in place; the production stranger-matching service is deliberately disabled until age assurance, moderation, and server-side matchmaking are configured.
+A lightweight Next.js interface for a moderated chat experience. The current UI is a preview: it can request local camera/microphone permissions and display messages locally, but it does not connect users or send messages to a server.
 
 ## Run locally
 
 1. Install Node.js 20 or newer.
 2. Run `npm install`.
 3. Copy `.env.example` to `.env.local`.
-4. Add the Supabase URL and publishable/anon key. Keep `SUPABASE_SERVICE_ROLE_KEY` server-only; never expose it in browser code.
+4. Set the Supabase project URL, publishable key, and server-only secret key. Legacy anon/service-role keys are supported by the health endpoint as alternatives.
 5. Run `npm run dev` and open http://localhost:3000.
-6. Visit `/api/health` to inspect the current backend readiness flags.
+6. Visit `/api/health` to check whether the environment variables are present.
+
+Never commit real credentials. Never expose a Supabase secret/service-role key in browser code or a `NEXT_PUBLIC_*` variable.
 
 ## Deploy to Vercel
 
-Import this repository in Vercel. Configure the environment variables from `.env.example` in the Vercel project settings, then deploy. The Supabase service-role key must be added only as a server environment variable, never as a `NEXT_PUBLIC_*` variable.
+Import this repository in Vercel, add the variables from `.env.example` in Project Settings → Environment Variables, then deploy. Redeploy after changing environment variables.
 
-## Database safety foundation
+## Supabase schema
 
-A reviewed starting schema is in `supabase/migrations/20261022000100_chat_safety_foundation.sql`. Apply it only to a dedicated Supabase project after reviewing it. It creates private tables for profiles, queue entries, matches, reports, and blocks, enables RLS, and revokes direct access from browser roles. The schema intentionally does not expose queue or match mutations to anonymous clients.
+The repository migration at `supabase/migrations/20261022000100_chat_safety_foundation.sql` is a separate, public-schema safety foundation for profiles, queue entries, matches, reports, and blocks. The 15-minute cleanup SQL supplied separately creates tables in the `private` schema (`chat_sessions`, `chat_messages`, `chat_queue`, `chat_reports`, `chat_blocks`) and is not automatically connected to the current UI.
 
-The `age_verified` field defaults to false and must only be set by a trusted age-verification provider webhook after a successful verification. A browser checkbox or editable user metadata is not age verification.
+Before applying additional SQL, check which schema/tables exist in Supabase to avoid maintaining two competing data models. Verify the `pg_cron` job appears and runs successfully; don't assume cleanup is working without testing it. Reports should have an explicit retention policy that allows moderation review.
 
-## Required before public launch
+## Lightweight design
 
-- Integrate a reliable age-assurance provider suitable for an 18+ service, including a trusted server-to-server callback.
-- Implement authenticated, rate-limited server-side matchmaking that checks verified age and bans, excludes blocked users, and atomically creates matches.
-- Implement short-lived, authorized WebRTC signaling and configure TURN as well as STUN.
-- Add a staffed report-review and escalation workflow, privacy policy, terms, abuse prevention, and retention/deletion rules.
-- Verify camera/microphone permission-denied, missing-device, reconnect, skip, report, block, and disconnect paths.
-- Conduct security review and test with multiple browsers before opening public access.
+- Uses system fonts rather than fetching external web fonts.
+- Does not store camera or microphone recordings.
+- Uses a small client-side interface without a heavy component library.
+- Stops local media tracks when leaving the chat screen.
 
-## Current status
+## Not ready for public launch
 
-Implemented: responsive landing page, chat UI, local camera/microphone permission flow, local text-composer preview, safety/age notice, server readiness endpoint, and private database schema foundation.
+Actual authentication, server-backed messaging, moderation operations, abuse prevention, and secure connection signaling are not implemented. The readiness endpoint intentionally reports those checks as false. Do not advertise the preview as live chat until these systems are implemented, reviewed, and tested for an age-appropriate, moderated community.
 
-Not implemented or enabled: verified age assurance, actual stranger matching, server signaling, remote video transport, server-backed messages, production reports/blocks, and moderation operations. The current UI does not connect strangers. Do not advertise it as a working live-chat service until those components are built, configured, and tested.
+Before launch, test keyboard navigation, mobile layout, camera permission denial, missing devices, connection loss, report/block workflows, rate limits, and cleanup jobs. Review Vercel and Supabase usage/retention limits for your project tier.
