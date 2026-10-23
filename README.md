@@ -1,37 +1,42 @@
 # OmeChat
 
-A lightweight Next.js interface for a moderated chat experience. The current UI is a preview: it can request local camera/microphone permissions and display messages locally, but it does not connect users or send messages to a server.
+OmeChat is a Next.js chat interface with server-side chat API foundations and optional Supabase Realtime/WebRTC helpers.
 
-## Run locally
+## Environment
 
-1. Install Node.js 20 or newer.
-2. Run `npm install`.
-3. Copy `.env.example` to `.env.local`.
-4. Set the Supabase project URL, publishable key, and server-only secret key. Legacy anon/service-role keys are supported by the health endpoint as alternatives.
-5. Run `npm run dev` and open http://localhost:3000.
-6. Visit `/api/health` to check whether the environment variables are present.
+Copy `.env.example` to `.env.local` and configure:
 
-Never commit real credentials. Never expose a Supabase secret/service-role key in browser code or a `NEXT_PUBLIC_*` variable.
+- `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` for the browser client.
+- `SUPABASE_SECRET_KEY` (or legacy `SUPABASE_SERVICE_ROLE_KEY`) server-side only.
+- `STUN_URLS`, `TURN_URLS`, and `TURN_REST_SECRET` for STUN and coturn-compatible TURN REST credentials.
 
-## Deploy to Vercel
+Never commit secrets or expose a Supabase secret key in a `NEXT_PUBLIC_*` variable. TURN REST credentials are short-lived and minted by `/api/ice-config`; the TURN server must use the same shared secret.
 
-Import this repository in Vercel, add the variables from `.env.example` in Project Settings → Environment Variables, then deploy. Redeploy after changing environment variables.
+## Database setup
 
-## Supabase schema
+Apply migrations in order in your Supabase project:
 
-The repository migration at `supabase/migrations/20261022000100_chat_safety_foundation.sql` is a separate, public-schema safety foundation for profiles, queue entries, matches, reports, and blocks. The 15-minute cleanup SQL supplied separately creates tables in the `private` schema (`chat_sessions`, `chat_messages`, `chat_queue`, `chat_reports`, `chat_blocks`) and is not automatically connected to the current UI.
+1. `supabase/migrations/20261022000100_chat_safety_foundation.sql`
+2. `supabase/migrations/20261022000200_chat_realtime_and_messages.sql`
+3. `supabase/migrations/20261022000300_atomic_chat_queue.sql`
 
-Before applying additional SQL, check which schema/tables exist in Supabase to avoid maintaining two competing data models. Verify the `pg_cron` job appears and runs successfully; don't assume cleanup is working without testing it. Reports should have an explicit retention policy that allows moderation review.
+The `public.chat_profiles.age_verified` flag must be set only by a trusted age-verification provider's server-side webhook. A checkbox or editable user metadata is not verification. Ensure Supabase Realtime private channels are enabled and public channel access is disabled.
 
-## Lightweight design
+## API and modules added
 
-- Uses system fonts rather than fetching external web fonts.
-- Does not store camera or microphone recordings.
-- Uses a small client-side interface without a heavy component library.
-- Stops local media tracks when leaving the chat screen.
+- `POST /api/chat/queue`: queue an eligible account for text/video matching using an atomic database function.
+- `DELETE /api/chat/queue`: remove the caller from the queue.
+- `GET /api/chat/messages?matchId=...`: fetch messages for the caller's active match.
+- `POST /api/chat/messages`: persist a message after checking eligibility and active match membership.
+- `GET /api/ice-config`: return STUN and short-lived TURN credentials for an eligible account.
+- `lib/chat/messages.ts`: helpers for history, sending, and private Realtime message subscriptions.
+- `lib/chat/webrtc.ts`: WebRTC offer/answer/ICE exchange over a private `match:<uuid>` channel.
+- `lib/supabase/browser.ts` and `lib/server/supabase-admin.ts`: browser/server Supabase clients.
 
-## Not ready for public launch
+## Integration status
 
-Actual authentication, server-backed messaging, moderation operations, abuse prevention, and secure connection signaling are not implemented. The readiness endpoint intentionally reports those checks as false. Do not advertise the preview as live chat until these systems are implemented, reviewed, and tested for an age-appropriate, moderated community.
+These APIs/helpers are infrastructure, not a completed live-chat launch. The current `app/page.tsx` preview still needs to be connected to Supabase Auth sessions, queue API, message helpers, Realtime channels, and the WebRTC peer helper. Do not enable public matching until trusted age verification is wired, Realtime policies are applied and tested, and report/block/skip/end-session workflows are implemented and tested. A client-side age declaration is not sufficient.
 
-Before launch, test keyboard navigation, mobile layout, camera permission denial, missing devices, connection loss, report/block workflows, rate limits, and cleanup jobs. Review Vercel and Supabase usage/retention limits for your project tier.
+## Local development and deployment
+
+Run `npm install`, then `npm run dev`. On Vercel, add environment variables in Project Settings → Environment Variables and redeploy. Check `/api/health`, Supabase logs, and Vercel logs. These changes have not been run through a build in this environment.
