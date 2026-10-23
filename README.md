@@ -20,8 +20,13 @@ Apply these migrations in order:
 2. `supabase/migrations/20261022000200_chat_realtime_and_messages.sql`
 3. `supabase/migrations/20261022000300_atomic_chat_queue.sql`
 4. `supabase/migrations/20261022000400_auth_chat_profile_trigger.sql`
+5. `supabase/migrations/20261022000500_chat_age_review_audit.sql`
 
 Private Realtime channels and the included RLS policies must be enabled and tested. The fourth migration backfills missing `chat_profiles` rows for existing Auth users and creates a profile for new signups. New profiles remain `age_verified = false`; the server APIs require that field to be populated by a trusted provider's server-side integration. This page does not add a self-declared age check. Coordinate that profile update with the provider before enabling real matching.
+
+## Admin panel
+
+The `/admin` panel lists up to 200 Auth accounts and their chat profile / age-review status. Access is restricted server-side to exact email addresses in the server-only `ADMIN_EMAILS` environment variable (comma-separated). Set it in local `.env.local` and Vercel Project Settings → Environment Variables, then redeploy. Do not put this variable under a `NEXT_PUBLIC_*` name. The admin age-review audit migration must be applied before using the review controls. Admin review actions require a note and are logged; approve an account only after appropriate age evidence has been reviewed under your verification policy.
 
 ## Connected frontend
 
