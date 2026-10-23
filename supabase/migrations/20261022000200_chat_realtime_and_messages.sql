@@ -47,3 +47,34 @@ with check (
 );
 
 comment on table public.chat_messages is 'Text chat history. Access through authenticated server endpoints; never grant direct browser access.';
+
+-- Broadcast committed text messages to the same private match topic.
+create or replace function public.omechat_broadcast_chat_message()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  perform realtime.send(
+    jsonb_build_object(
+      'id', new.id,
+      'match_id', new.match_id,
+      'sender_id', new.sender_id,
+      'body', new.body,
+      'created_at', new.created_at
+    ),
+    'message',
+    'match:' || new.match_id::text,
+    true
+  );
+  return new;
+end;
+$$;
+
+revoke all on function public.omechat_broadcast_chat_message() from public, anon, authenticated;
+
+drop trigger if exists omechat_chat_message_broadcast on public.chat_messages;
+create trigger omechat_chat_message_broadcast
+after insert on public.chat_messages
+for each row execute function public.omechat_broadcast_chat_message();
