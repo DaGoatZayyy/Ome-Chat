@@ -104,10 +104,25 @@ export async function PATCH(request: Request) {
   }
 
   if (!existing) {
-    const { error: createError } = await admin.from("chat_profiles").insert({ user_id: input.userId });
+    const { error: createError } = await admin.from("chat_profiles").upsert({
+      user_id: input.userId,
+      age_verified: false,
+      age_verified_at: null,
+      verification_provider: null,
+      country_code: null,
+      interests: [],
+      banned_at: null,
+    }, { onConflict: "user_id", ignoreDuplicates: true });
     if (createError) {
-      console.error("admin profile create failed", createError.message);
-      return NextResponse.json({ error: "Could not create the chat profile." }, { status: 503 });
+      console.error("admin profile create failed", {
+        code: createError.code,
+        message: createError.message,
+        details: createError.details,
+        hint: createError.hint,
+      });
+      return NextResponse.json({
+        error: "Could not create the chat profile. Check the Vercel Function Logs for the 'admin profile create failed' database error.",
+      }, { status: 503 });
     }
   }
 
