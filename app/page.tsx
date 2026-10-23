@@ -1,175 +1,33 @@
 "use client";
-
-import { useEffect, useRef, useState } from "react";
-
-type Mode = "video" | "text";
-type Screen = "home" | "chat";
-
-const countries = [
-  ["US", "United States"], ["CA", "Canada"], ["GB", "United Kingdom"],
-  ["AU", "Australia"], ["IN", "India"], ["DE", "Germany"], ["FR", "France"],
-  ["BR", "Brazil"], ["JP", "Japan"], ["MX", "Mexico"], ["ANY", "Any country"]
-];
-
-export default function Home() {
-  const [screen, setScreen] = useState<Screen>("home");
-  const [mode, setMode] = useState<Mode>("video");
-  const [interests, setInterests] = useState("");
-  const [country, setCountry] = useState("US");
-  const [countryFilter, setCountryFilter] = useState(true);
-  const [ageConfirmed, setAgeConfirmed] = useState(false);
-  const [agePrompt, setAgePrompt] = useState(false);
-  const [cameraError, setCameraError] = useState("");
-  const [status, setStatus] = useState("Choose a chat mode to get started.");
-  const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState<string[]>([]);
-  const [showSettings, setShowSettings] = useState(false);
-  const [muted, setMuted] = useState(false);
-  const [cameraOff, setCameraOff] = useState(false);
-  const [reported, setReported] = useState(false);
-  const localVideo = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-
-  useEffect(() => () => streamRef.current?.getTracks().forEach(track => track.stop()), []);
-
-  async function start(modeChoice: Mode) {
-    setMode(modeChoice);
-    if (!ageConfirmed) {
-      setAgePrompt(true);
-      return;
-    }
-    setScreen("chat");
-    setReported(false);
-    setMessages([]);
-    setCameraError("");
-    if (modeChoice === "video") {
-      try {
-        if (!navigator.mediaDevices?.getUserMedia) throw new Error("This browser does not support camera access.");
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        streamRef.current?.getTracks().forEach(track => track.stop());
-        streamRef.current = stream;
-        if (localVideo.current) localVideo.current.srcObject = stream;
-        setStatus("Camera and microphone ready. Matching is not configured yet.");
-      } catch (err) {
-        setCameraError(err instanceof Error ? err.message : "Camera or microphone permission was not granted.");
-        setStatus("Video unavailable. You can switch to text chat.");
-      }
-    } else {
-      setStatus("Text chat preview. Matching is not configured yet.");
-    }
-  }
-
-  function endChat() {
-    streamRef.current?.getTracks().forEach(track => track.stop());
-    streamRef.current = null;
-    setScreen("home");
-    setStatus("Choose a chat mode to get started.");
-  }
-
-  function sendMessage() {
-    const clean = message.trim();
-    if (!clean) return;
-    setMessages(prev => [...prev, clean]);
-    setMessage("");
-  }
-
-  function toggleTrack(kind: "audio" | "video") {
-    const track = streamRef.current?.getTracks().find(t => t.kind === kind);
-    if (track) {
-      track.enabled = !track.enabled;
-      if (kind === "audio") setMuted(!track.enabled);
-      else setCameraOff(!track.enabled);
-    }
-  }
-
-  if (screen === "chat") {
-    return (
-      <main className="chat-shell">
-        <header className="chat-header">
-          <a className="brand" href="/" onClick={e => { e.preventDefault(); endChat(); }}>
-            <span className="brand-icon">•••</span><span>OmeChat</span>
-          </a>
-          <div className="header-actions">
-            <button className="icon-button" aria-label="Settings" onClick={() => setShowSettings(v => !v)}>⚙</button>
-            <span className="pill">◉ {mode === "video" ? "Video" : "Text"} mode</span>
-            <select aria-label="Country" value={country} onChange={e => setCountry(e.target.value)}>
-              {countries.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
-            </select>
-          </div>
-        </header>
-        <div className="chat-grid">
-          <section className="video-column">
-            <div className="remote-video">
-              <div className="remote-placeholder"><span className="pulse-dot" /><strong>Waiting for a connection</strong><small>Live matching is not configured yet.</small></div>
-              {mode === "video" && <video ref={localVideo} autoPlay muted playsInline className="local-video" />}
-              {mode === "video" && cameraOff && <div className="camera-off">Camera off</div>}
-            </div>
-            <div className="video-controls">
-              <button className={muted ? "round-control active" : "round-control"} onClick={() => toggleTrack("audio")} aria-label={muted ? "Unmute microphone" : "Mute microphone"}>{muted ? "Mic off" : "Mic on"}</button>
-              <button className={cameraOff ? "round-control active" : "round-control"} onClick={() => toggleTrack("video")} aria-label={cameraOff ? "Turn camera on" : "Turn camera off"}>{cameraOff ? "Cam off" : "Cam on"}</button>
-              <button className="round-control danger" onClick={endChat}>End chat</button>
-            </div>
-          </section>
-          <section className="conversation-panel">
-            {cameraError && <div className="notice warning"><strong>Video access unavailable</strong><p>{cameraError}</p><button className="secondary-button" onClick={() => start("text")}>Switch to text</button></div>}
-            <div className="status-banner"><span className="pulse-dot" />{status}</div>
-            {showSettings && <div className="notice"><strong>Chat settings</strong><label className="check-row"><input type="checkbox" checked={countryFilter} onChange={e => setCountryFilter(e.target.checked)} /> Prefer people in {countries.find(c => c[0] === country)?.[1]}</label><p className="muted">Settings are saved for this session only.</p></div>}
-            <div className="message-list">
-              {messages.length === 0 ? <div className="empty-chat"><div className="empty-icon">✦</div><h2>{mode === "video" ? "Ready when you are" : "Start a conversation"}</h2><p>This is the interface preview. It does not connect you to strangers until a secure matching service is configured.</p></div> :
-                messages.map((item, i) => <div className="message-bubble own" key={i}>{item}</div>)}
-            </div>
-            <div className="composer">
-              <button className="new-chat" onClick={() => { setMessages([]); setStatus("No match available — matching backend not configured."); }}>New<br />Chat<span>Esc</span></button>
-              <input value={message} onChange={e => setMessage(e.target.value)} onKeyDown={e => { if (e.key === "Enter") sendMessage(); }} placeholder="Write a message..." aria-label="Message" />
-              <button className="send-button" onClick={sendMessage} disabled={!message.trim()}>Send<span>Enter</span></button>
-            </div>
-            <div className="safety-row"><button onClick={() => { setReported(true); setStatus("Report recorded in this local preview only."); }}>⚑ Report user</button>{reported && <span>Preview only — no report was sent to a server.</span>}<span>Never share personal information.</span></div>
-          </section>
-        </div>
-      </main>
-    );
-  }
-
-  return (
-    <main>
-      <div className="hero-section">
-        <header className="site-header">
-          <a className="brand" href="#"><span className="brand-icon">•••</span><span>OmeChat</span></a>
-          <nav><a href="#how">How OmeChat works</a><a href="#faq">FAQ</a><a href="#safety">Safety</a></nav>
-        </header>
-        <div className="hero-grid">
-          <section className="hero-copy">
-            <div className="eyebrow"><span className="pulse-dot" /> A new way to connect</div>
-            <h1>Random Video &amp; Text<br className="desktop-break" /> Chat with Strangers</h1>
-            <p className="hero-description">Meet someone new on OmeChat, a simple place for video and text conversations. No account needed for this preview.</p>
-            <div className="prompt-card"><span>A friendly debate</span><p>What’s a completely harmless opinion you’ll always defend?</p><button onClick={() => setInterests("Movies, music, friendly debates")}>Use these interests <span>↗</span></button></div>
-            <div className="hero-stats"><div><strong>01</strong><span>Choose a mode</span></div><div><strong>02</strong><span>Set interests</span></div><div><strong>03</strong><span>Meet and chat</span></div></div>
-          </section>
-          <section className="start-card">
-            <div className="card-heading"><span className="card-heading-icon">✦</span><div><h2>Choose text or video</h2><p>Start a new conversation</p></div></div>
-            <button className="primary-button" onClick={() => start("video")}>Start video chat <span>→</span></button>
-            <button className="secondary-button" onClick={() => start("text")}>Start text chat <span>→</span></button>
-            <div className="card-divider" />
-            <label htmlFor="interests">Add topics you’d like to talk about.</label>
-            <input id="interests" className="field" value={interests} onChange={e => setInterests(e.target.value)} placeholder="Add your interests (optional)" maxLength={120} />
-            <label htmlFor="country">Preferred country (optional)</label>
-            <select id="country" className="field country-select" value={country} onChange={e => setCountry(e.target.value)}>
-              {countries.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
-            </select>
-            <div className="age-note"><span>18+</span><p>You must be 18 or older to use this site. Read our <a href="#safety">safety guidelines</a>.</p></div>
-            <p className="config-note">Preview build: live stranger matching is not enabled.</p>
-          </section>
-        </div>
-      </div>
-      <section className="how-section" id="how">
-        <div className="section-inner"><div className="section-kicker">SIMPLE BY DESIGN</div><h2>How OmeChat works</h2><p className="section-intro">Choose a chat mode, add topics if you like, and stay in control of your conversation.</p>
-          <div className="steps-grid"><article><strong>01</strong><h3>Pick your chat mode</h3><p>Choose video or text, depending on what works for you.</p></article><article><strong>02</strong><h3>Add interests</h3><p>Share a few topics to help guide the conversation.</p></article><article><strong>03</strong><h3>Start chatting</h3><p>Use the conversation controls to manage your session.</p></article><article><strong>04</strong><h3>Leave anytime</h3><p>End a conversation whenever you want to stop.</p></article></div>
-        </div>
-      </section>
-      <section className="safety-section" id="safety"><div className="safety-content"><div className="safety-icon">盾</div><div><div className="section-kicker">YOUR SAFETY MATTERS</div><h2>Keep conversations respectful</h2><p>Never share your home address, school, passwords, financial details, or other identifying information. Leave any conversation that makes you uncomfortable and report abusive behavior. Do not record or share another person’s video without their permission.</p></div></div></section>
-      <section className="faq-section" id="faq"><div className="section-inner"><div className="section-kicker">GOOD TO KNOW</div><h2>Frequently asked questions</h2><details><summary>Do I need an account?</summary><p>This interface preview does not require an account. A production service may require an account or additional checks to help protect users.</p></details><details><summary>Why is video access unavailable?</summary><p>Your browser will ask for camera and microphone permission. If you deny permission or have no available device, switch to text chat. Camera access requires HTTPS outside localhost.</p></details><details><summary>Is live matching enabled?</summary><p>No. This repository currently contains the interface preview only. A secure matching backend, real-time signaling, age assurance, and moderation operations must be configured before public launch.</p></details></div></section>
-      <footer><a className="brand" href="#"><span className="brand-icon">•••</span><span>OmeChat</span></a><span>Built for respectful conversations.</span><span>18+ only</span></footer>
-      {agePrompt && <div className="modal-backdrop" role="presentation"><div className="age-modal" role="dialog" aria-modal="true" aria-labelledby="age-title"><div className="modal-symbol">18+</div><h2 id="age-title">Before you continue</h2><p>OmeChat is intended for adults aged 18 and older. This checkbox is only a self-declaration and does not verify age.</p><label className="check-row"><input type="checkbox" checked={ageConfirmed} onChange={e => setAgeConfirmed(e.target.checked)} /> I confirm that I am 18 or older.</label><div className="modal-actions"><button className="secondary-button" onClick={() => setAgePrompt(false)}>Go back</button><button className="primary-button" disabled={!ageConfirmed} onClick={() => { setAgePrompt(false); void start(mode); }}>Continue <span>→</span></button></div><small>Do not continue if you are under 18.</small></div></div>}
-    </main>
-  );
+import { useCallback,useEffect,useRef,useState,type FormEvent } from "react";
+import type { User } from "@supabase/supabase-js";
+import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { loadMatchMessages,sendMatchMessage,subscribeToMatchMessages,type ChatMessage } from "@/lib/chat/messages";
+import { createMatchPeer } from "@/lib/chat/webrtc";
+type Mode="text"|"video";
+type Match={id:string;user_a:string;user_b:string;mode:Mode;status:string};
+const countries=[["US","United States"],["CA","Canada"],["GB","United Kingdom"],["AU","Australia"],["IN","India"],["DE","Germany"],["FR","France"],["BR","Brazil"],["JP","Japan"],["MX","Mexico"],["ANY","Any country"]];
+export default function Home(){
+ const supabase=getSupabaseBrowserClient();
+ const [user,setUser]=useState<User|null>(null),[ready,setReady]=useState(false),[authMode,setAuthMode]=useState<"signin"|"signup">("signin"),[email,setEmail]=useState(""),[password,setPassword]=useState(""),[busy,setBusy]=useState(false);
+ const [screen,setScreen]=useState<"home"|"chat">("home"),[mode,setMode]=useState<Mode>("text"),[interests,setInterests]=useState(""),[country,setCountry]=useState("US"),[countryFilter,setCountryFilter]=useState(true);
+ const [status,setStatus]=useState("Sign in to get started."),[error,setError]=useState(""),[message,setMessage]=useState(""),[messages,setMessages]=useState<ChatMessage[]>([]),[match,setMatch]=useState<Match|null>(null),[queueing,setQueueing]=useState(false),[settings,setSettings]=useState(false),[muted,setMuted]=useState(false),[cameraOff,setCameraOff]=useState(false),[reporting,setReporting]=useState(false),[category,setCategory]=useState("harassment"),[details,setDetails]=useState("");
+ const localVideo=useRef<HTMLVideoElement>(null),remoteVideo=useRef<HTMLVideoElement>(null),streamRef=useRef<MediaStream|null>(null),peerClose=useRef<(()=>Promise<void>)|null>(null),unsubscribe=useRef<(()=>void)|null>(null),matchIdRef=useRef<string|null>(null),pollRef=useRef(false);
+ const getToken=useCallback(async()=> (await supabase.auth.getSession()).data.session?.access_token??null,[supabase]);
+ const api=useCallback(async(path:string,init:RequestInit={})=>{const t=await getToken();if(!t)throw Error("Your session expired. Sign in again.");const r=await fetch(path,{...init,headers:{Authorization:`Bearer ${t}`,"Content-Type":"application/json",...(init.headers??{})},cache:"no-store"});const j=await r.json().catch(()=>({}));if(!r.ok)throw Error(j.error??`Request failed (${r.status})`);return j;},[getToken]);
+ useEffect(()=>{let alive=true;supabase.auth.getSession().then(({data})=>{if(alive){setUser(data.session?.user??null);setReady(true)}});const {data:{subscription}}=supabase.auth.onAuthStateChange((_e,s)=>{setUser(s?.user??null);setReady(true)});return()=>{alive=false;subscription.unsubscribe()}},[supabase]);
+ const cleanup=useCallback(async()=>{if(peerClose.current){await peerClose.current().catch(()=>{});peerClose.current=null}unsubscribe.current?.();unsubscribe.current=null;streamRef.current?.getTracks().forEach(t=>t.stop());streamRef.current=null;if(localVideo.current)localVideo.current.srcObject=null;if(remoteVideo.current)remoteVideo.current.srcObject=null;matchIdRef.current=null;setMuted(false);setCameraOff(false)},[]);
+ useEffect(()=>()=>{void cleanup()},[cleanup]);
+ async function authSubmit(e:FormEvent){e.preventDefault();setBusy(true);setError("");try{const r=authMode==="signin"?await supabase.auth.signInWithPassword({email:email.trim(),password}):await supabase.auth.signUp({email:email.trim(),password,options:{emailRedirectTo:window.location.origin}});if(r.error)throw r.error;if(authMode==="signup"&&!r.data.session)setStatus("Check your email to confirm your account.");else setStatus("Signed in. Choose a chat mode.")}catch(e){setError(e instanceof Error?e.message:"Authentication failed")}finally{setBusy(false)}}
+ async function signOut(){await endChat(false);await supabase.auth.signOut();setUser(null)}
+ async function attach(found:Match,ownId:string){if(matchIdRef.current===found.id)return;await cleanup();matchIdRef.current=found.id;setMatch(found);setMode(found.mode);setMessages([]);setQueueing(false);setReporting(false);setError("");setStatus(found.mode==="text"?"Connected.":"Match found. Connecting video…");try{const t=await getToken();if(!t)throw Error("Session expired.");unsubscribe.current=await subscribeToMatchMessages({supabase,matchId:found.id,accessToken:t,onMessage:m=>setMessages(prev=>prev.some(x=>x.id===m.id)?prev:[...prev,m])});const history=await loadMatchMessages(found.id,t);setMessages(prev=>{const all=[...history,...prev];return all.filter((m,i)=>all.findIndex(x=>x.id===m.id)===i).sort((a,b)=>a.created_at.localeCompare(b.created_at))});if(found.mode==="video"){const stream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});streamRef.current=stream;if(localVideo.current)localVideo.current.srcObject=stream;const cfg=await api("/api/ice-config");const pc=await createMatchPeer({supabase,matchId:found.id,accessToken:t,localStream:stream,iceServers:cfg.iceServers??[],initiator:found.user_a===ownId,remoteVideo:remoteVideo.current!,callbacks:{onState:s=>{if(s==="connected")setStatus("Video connected.");},onError:setError}});peerClose.current=pc.close}}catch(e){setError(e instanceof Error?e.message:"Could not connect to chat.")}}
+ async function poll(ownId:string){if(!pollRef.current)return;try{const r=await api("/api/chat/session");if(!pollRef.current)return;if(r.match?.id){await attach(r.match,ownId);return}setTimeout(()=>void poll(ownId),1800)}catch(e){setError(e instanceof Error?e.message:"Queue check failed");setTimeout(()=>{if(pollRef.current)void poll(ownId)},3000)}}
+ async function startChat(selected:Mode){if(!user){setError("Sign in first.");return}setError("");setScreen("chat");setMode(selected);setQueueing(true);setMatch(null);setMessages([]);setStatus("Looking for a match…");try{if(selected==="video"){const s=await navigator.mediaDevices.getUserMedia({video:true,audio:true});streamRef.current=s;if(localVideo.current)localVideo.current.srcObject=s}const r=await api("/api/chat/queue",{method:"POST",body:JSON.stringify({mode:selected,countryCode:country==="ANY"||!countryFilter?null:country,interests:interests.split(",").map(x=>x.trim()).filter(Boolean).slice(0,10)})});if(r.match_id){const s=await api("/api/chat/session");await attach(s.match??{id:r.match_id,user_a:user.id,user_b:r.peer_id??"",mode:selected,status:"active"},user.id)}else{pollRef.current=true;setStatus("In queue. Waiting for another person…");void poll(user.id)}}catch(e){setQueueing(false);await cleanup();setError(e instanceof Error?e.message:"Could not start matching");setStatus("Matching unavailable.")}}
+ async function endChat(back=true){pollRef.current=false;try{if(match?.id)await api(`/api/chat/session?matchId=${encodeURIComponent(match.id)}`,{method:"DELETE"});else await api("/api/chat/queue",{method:"DELETE"})}catch{}await cleanup();setMatch(null);setMessages([]);setMessage("");setQueueing(false);setReporting(false);if(back){setScreen("home");setStatus("Chat ended.")}}
+ async function send(){if(!match||!message.trim())return;const body=message.trim();setMessage("");try{const t=await getToken();if(!t)throw Error("Session expired.");const m=await sendMatchMessage(match.id,body,t);setMessages(p=>p.some(x=>x.id===m.id)?p:[...p,m])}catch(e){setError(e instanceof Error?e.message:"Message failed");setMessage(body)}}
+ async function report(){if(!match)return;try{await api("/api/chat/report",{method:"POST",body:JSON.stringify({matchId:match.id,category,details})});setReporting(false);setStatus("Report submitted.");await endChat()}catch(e){setError(e instanceof Error?e.message:"Report failed")}}
+ function toggle(kind:"audio"|"video"){const t=streamRef.current?.getTracks().find(x=>x.kind===kind);if(t){t.enabled=!t.enabled;if(kind==="audio")setMuted(!t.enabled);else setCameraOff(!t.enabled)}}
+ if(!ready)return <main className="hero-section"><p>Connecting to Supabase…</p></main>;
+ if(screen==="chat")return <main className="chat-shell"><header className="chat-header"><a className="brand" href="/" onClick={e=>{e.preventDefault();void endChat()}}><span className="brand-icon">•••</span> OmeChat</a><div className="header-actions"><span className="pill">{user?.email}</span><button className="icon-button" onClick={()=>setSettings(!settings)}>⚙</button></div></header><div className="chat-grid"><section className="video-column"><div className="remote-video">{mode==="video"?<><video ref={remoteVideo} autoPlay playsInline style={{width:"100%",height:"100%",objectFit:"cover"}}/><div className="remote-placeholder" style={{position:"absolute",pointerEvents:"none"}}><span className="pulse-dot"/><strong>{match?"Connecting video…":"Finding a match…"}</strong></div><video ref={localVideo} autoPlay muted playsInline className="local-video"/>{cameraOff&&<div className="camera-off">Camera off</div>}</>:<div className="remote-placeholder"><span className="pulse-dot"/><strong>{match?"Text chat connected":"Finding someone…"}</strong></div>}</div><div className="video-controls">{mode==="video"&&<><button className="round-control" onClick={()=>toggle("audio")}>{muted?"Mic off":"Mic on"}</button><button className="round-control" onClick={()=>toggle("video")}>{cameraOff?"Cam off":"Cam on"}</button></>}<button className="round-control danger" onClick={()=>void endChat()}>End chat</button></div></section><section className="conversation-panel"><div className="status-banner"><span className="pulse-dot"/>{status}</div>{error&&<div className="notice warning"><strong>Notice</strong><p>{error}</p><button className="secondary-button" onClick={()=>setError("")}>Dismiss</button></div>}{settings&&<div className="notice"><strong>Matching settings</strong><label className="check-row"><input type="checkbox" checked={countryFilter} onChange={e=>setCountryFilter(e.target.checked)}/> Filter by country</label><select className="field" value={country} onChange={e=>setCountry(e.target.value)}>{countries.map(([c,n])=><option key={c} value={c}>{n}</option>)}</select></div>}{reporting&&<div className="notice warning"><strong>Report conversation</strong><select className="field" value={category} onChange={e=>setCategory(e.target.value)}><option value="harassment">Harassment</option><option value="sexual_content">Sexual content</option><option value="underage_concern">Underage concern</option><option value="threats">Threats</option><option value="spam">Spam</option><option value="other">Other</option></select><input className="field" value={details} onChange={e=>setDetails(e.target.value.slice(0,2000))} placeholder="Details (optional)"/><button className="primary-button" onClick={()=>void report()}>Submit report</button><button className="secondary-button" onClick={()=>setReporting(false)}>Cancel</button></div>}<div className="message-list">{messages.length===0?<div className="empty-chat"><div className="empty-icon">✦</div><h2>{match?"Say hello":"Finding a conversation"}</h2><p>{match?"Messages sync through Supabase Realtime.":"Keep this page open while matching runs."}</p></div>:messages.map(m=><div key={m.id} className={m.sender_id===user?.id?"message-bubble own":"message-bubble"}>{m.body}</div>)}</div><div className="composer"><button className="new-chat" disabled={queueing} onClick={()=>void endChat(false).then(()=>startChat(mode))}>New<br/>Chat<span>Find next</span></button><input value={message} disabled={!match} onChange={e=>setMessage(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")void send()}} placeholder={match?"Write a message…":"Waiting for a match…"}/><button className="send-button" disabled={!match||!message.trim()} onClick={()=>void send()}>Send<span>Enter</span></button></div><div className="safety-row"><button disabled={!match} onClick={()=>setReporting(!reporting)}>⚑ Report user</button><span>Never share personal information.</span><button onClick={()=>void signOut()}>Sign out</button></div></section></div></main>;
+ return <main><div className="hero-section"><header className="site-header"><a className="brand" href="#"><span className="brand-icon">•••</span> OmeChat</a><nav><a href="#how">How it works</a><a href="#faq">FAQ</a><a href="#safety">Safety</a></nav></header><div className="hero-grid"><section className="hero-copy"><div className="eyebrow"><span className="pulse-dot"/> SUPABASE CONNECTED</div><h1>Random Video &amp; Text<br className="desktop-break"/> Chat</h1><p className="hero-description">Sign in, choose a mode, and connect through your configured Supabase backend.</p><div className="prompt-card"><span>Conversation starter</span><p>What’s a harmless opinion you’ll always defend?</p><button onClick={()=>setInterests("Movies, music, friendly debates")}>Use these interests ↗</button></div><div className="hero-stats"><div><strong>01</strong><span>Sign in</span></div><div><strong>02</strong><span>Choose mode</span></div><div><strong>03</strong><span>Chat</span></div></div></section><section className="start-card"><div className="card-heading"><span className="card-heading-icon">✦</span><div><h2>{user?"Signed in":"Sign in to OmeChat"}</h2><p>{user?.email??"Supabase Auth"}</p></div></div>{user?<><button className="primary-button" onClick={()=>void startChat("video")}>Find video chat →</button><button className="secondary-button" onClick={()=>void startChat("text")}>Find text chat →</button><button className="secondary-button" onClick={()=>void signOut()}>Sign out</button></>:<form onSubmit={authSubmit}><label htmlFor="email">Email</label><input id="email" className="field" type="email" autoComplete="email" required value={email} onChange={e=>setEmail(e.target.value)}/><label htmlFor="password">Password</label><input id="password" className="field" type="password" minLength={8} autoComplete={authMode==="signin"?"current-password":"new-password"} required value={password} onChange={e=>setPassword(e.target.value)}/><button className="primary-button" disabled={busy}>{busy?"Please wait…":authMode==="signin"?"Sign in":"Create account"}</button><button type="button" className="secondary-button" onClick={()=>{setAuthMode(v=>v==="signin"?"signup":"signin");setError("")}}>{authMode==="signin"?"Need an account? Sign up":"Already registered? Sign in"}</button></form>}<div className="card-divider"/><label htmlFor="interests">Interests (comma-separated)</label><input id="interests" className="field" value={interests} maxLength={120} onChange={e=>setInterests(e.target.value)} placeholder="Music, games, movies"/><label htmlFor="country-home">Preferred country</label><select id="country-home" className="field country-select" value={country} onChange={e=>setCountry(e.target.value)}>{countries.map(([c,n])=><option key={c} value={c}>{n}</option>)}</select>{error&&<div className="notice warning"><strong>Could not continue</strong><p>{error}</p></div>}<p className="config-note">Account eligibility is managed server-side. No age self-declaration is collected by this page.</p></section></div></div><section className="how-section" id="how"><div className="section-inner"><div className="section-kicker">SIMPLE BY DESIGN</div><h2>How OmeChat works</h2><p className="section-intro">Authenticate with Supabase, match, exchange messages, and end or report a conversation.</p><div className="steps-grid"><article><strong>01</strong><h3>Sign in</h3><p>Supabase Auth handles accounts and sessions.</p></article><article><strong>02</strong><h3>Choose a mode</h3><p>Start text or video matchmaking.</p></article><article><strong>03</strong><h3>Chat in real time</h3><p>Messages persist and broadcast through Supabase Realtime.</p></article><article><strong>04</strong><h3>Stay in control</h3><p>End conversations or submit a report.</p></article></div></div></section><section className="safety-section" id="safety"><div className="safety-content"><div className="safety-icon">盾</div><div><div className="section-kicker">SAFETY</div><h2>Keep conversations respectful</h2><p>Do not share your address, school, passwords, financial details, or other identifying information. Leave conversations that make you uncomfortable and report abusive behavior.</p></div></div></section><section className="faq-section" id="faq"><div className="section-inner"><div className="section-kicker">GOOD TO KNOW</div><h2>Frequently asked questions</h2><details><summary>How does sign-up work?</summary><p>Supabase Auth handles account creation, sign-in, sessions, and email confirmation.</p></details><details><summary>Why might matching be unavailable?</summary><p>Apply the migrations and configure Supabase/Vercel environment variables. Provider-controlled account eligibility must be configured separately.</p></details><details><summary>What does video need?</summary><p>HTTPS, camera permission, private Realtime signaling, and working STUN/TURN settings.</p></details></div></section><footer><a className="brand" href="#"><span className="brand-icon">•••</span> OmeChat</a><span>Built for respectful conversations.</span><span>Provider integration pending</span></footer></main>;
 }
