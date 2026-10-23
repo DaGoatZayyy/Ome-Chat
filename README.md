@@ -26,6 +26,9 @@ The `public.chat_profiles.age_verified` flag must be set only by a trusted age-v
 
 - `POST /api/chat/queue`: queue an eligible account for text/video matching using an atomic database function.
 - `DELETE /api/chat/queue`: remove the caller from the queue.
+- `GET /api/chat/session`: check whether the caller has an active match.
+- `DELETE /api/chat/session?matchId=...`: end the caller's active match.
+- `POST /api/chat/report`: submit a moderation report and block repeat matching with the reported account.
 - `GET /api/chat/messages?matchId=...`: fetch messages for the caller's active match.
 - `POST /api/chat/messages`: persist a message after checking eligibility and active match membership.
 - `GET /api/ice-config`: return STUN and short-lived TURN credentials for an eligible account.
@@ -35,7 +38,7 @@ The `public.chat_profiles.age_verified` flag must be set only by a trusted age-v
 
 ## Integration status
 
-These APIs/helpers are infrastructure, not a completed live-chat launch. The current `app/page.tsx` preview still needs to be connected to Supabase Auth sessions, queue API, message helpers, Realtime channels, and the WebRTC peer helper. Do not enable public matching until trusted age verification is wired, Realtime policies are applied and tested, and report/block/skip/end-session workflows are implemented and tested. A client-side age declaration is not sufficient.
+These APIs/helpers are infrastructure, not a completed live-chat launch. The current `app/page.tsx` preview still needs to be connected to Supabase Auth sessions, queue API, message helpers, Realtime channels, and the WebRTC peer helper. Do not enable public matching until trusted age verification is wired, Realtime policies are applied and tested, and the frontend's report/block/skip/end-session workflows are connected and tested. A client-side age declaration is not sufficient.
 
 ## Local development and deployment
 
