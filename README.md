@@ -19,8 +19,9 @@ Apply these migrations in order:
 1. `supabase/migrations/20261022000100_chat_safety_foundation.sql`
 2. `supabase/migrations/20261022000200_chat_realtime_and_messages.sql`
 3. `supabase/migrations/20261022000300_atomic_chat_queue.sql`
+4. `supabase/migrations/20261022000400_auth_chat_profile_trigger.sql`
 
-Private Realtime channels and the included RLS policies must be enabled and tested. The existing server APIs require `chat_profiles.age_verified` to be populated by the trusted provider's server-side integration; this page does not add a self-declared age check. Coordinate that profile update with the provider before enabling real matching.
+Private Realtime channels and the included RLS policies must be enabled and tested. The fourth migration backfills missing `chat_profiles` rows for existing Auth users and creates a profile for new signups. New profiles remain `age_verified = false`; the server APIs require that field to be populated by a trusted provider's server-side integration. This page does not add a self-declared age check. Coordinate that profile update with the provider before enabling real matching.
 
 ## Connected frontend
 
