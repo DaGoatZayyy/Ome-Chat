@@ -95,7 +95,7 @@ export async function PATCH(request: Request) {
   const approving = input.action === "approve_age";
   const now = new Date().toISOString();
   const { data: existing, error: profileReadError } = await admin.from("chat_profiles")
-    .select("user_id")
+    .select("user_id,age_verified,age_verified_at,verification_provider")
     .eq("user_id", input.userId)
     .maybeSingle();
 
@@ -134,9 +134,9 @@ export async function PATCH(request: Request) {
     console.error("admin age review audit failed", auditError.message);
     // Fail closed: undo an approval/revocation if its audit record cannot be saved.
     await admin.from("chat_profiles").update({
-      age_verified: false,
-      age_verified_at: null,
-      verification_provider: null,
+      age_verified: existing?.age_verified ?? false,
+      age_verified_at: existing?.age_verified_at ?? null,
+      verification_provider: existing?.verification_provider ?? null,
       updated_at: new Date().toISOString(),
     }).eq("user_id", input.userId);
     return NextResponse.json({ error: "Could not save the audit record; the profile was reset to unverified." }, { status: 503 });
